@@ -1,0 +1,4 @@
+*.pem
+*.key
+inventory.ini
+.DS_Store
