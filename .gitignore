@@ -1,5 +1,8 @@
-# Ansible 관련
+# ■ Ansible 관련 ■
+
+# Keys 
 *.pem
 *.key
-inventory.ini
+
+# OS
 .DS_Store
