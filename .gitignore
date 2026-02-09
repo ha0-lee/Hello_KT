@@ -1,4 +1,4 @@
 *.pem
 *.key
-inventory.ini
+ansible/inventory/
 .DS_Store
