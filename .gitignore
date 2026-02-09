@@ -1,4 +1,4 @@
 *.pem
 *.key
-inventory.ini
+/inventory
 .DS_Store
