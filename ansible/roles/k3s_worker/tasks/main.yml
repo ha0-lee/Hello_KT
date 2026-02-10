@@ -1,0 +1,7 @@
+---
+# worker는 master의 ip와 토큰이 필요함
+- name: 1. K3s 다운로드 및 실행 
+  shell: >
+    curl https://get.k3s.io | K3S_URL=https://{{ hostvars[groups['master'][0]]['ansible_host'] }}:6443 K3S_TOKEN={{ hostvars[groups['master'][0]]['k3s_token'] }} sh -
+  args:
+    creates: /usr/local/bin/k3s-agent

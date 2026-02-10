@@ -1,0 +1,22 @@
+---
+- name: 1. 스왑 파일 존재 확인
+  stat:
+    path: /swapfile
+  register: swapfile_check
+
+- name: 2. 스왑 파일 생성 (없을 때만)
+  command: fallocate -l 2G /swapfile
+  when: not swapfile_check.stat.exists
+
+- name: 3. 권한 설정ㄹ
+  file:
+    path: /swapfile
+    mode: '0600'
+
+- name: 4. 스왑 영역 설정
+  command: mkswap /swapfile
+  when: not swapfile_check.stat.exists
+
+- name: 5. 스왑 활성화
+  command: swapon /swapfile
+  when: not swapfile_check.stat.exists
