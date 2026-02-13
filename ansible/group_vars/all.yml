@@ -1,0 +1,28 @@
+---
+# [전역 변수 설정]
+# 모든 역할(roles)에서 공통으로 사용할 변수들입니다.
+
+# K3s 버전 (Master/Worker 공통 적용)
+k3s_version: "v1.34.3+k3s1"
+
+# 설치 스크립트 URL
+k3s_install_url: "https://get.k3s.io"
+
+# 마스터 실행 옵션 (Master Role에서 사용)
+k3s_server_options:
+  - "--write-kubeconfig-mode=644"
+  - "--disable=traefik"
+  - "--disable=servicelb"
+  - "--node-taint=CriticalAddonsOnly=true:NoExecute"
+  # 모니터링 서버(Bastion) IP를 SAN에 추가 (인벤토리 그룹명 monitoring이 정확해야 함)
+  - "--tls-san={{ hostvars[groups['monitoring'][0]]['ansible_default_ipv4']['address'] }}"
+
+# 공통 설정
+k3s_api_port: 6443
+k3s_service_start_wait: 30
+k3s_install_retry_count: 3
+k3s_install_retry_delay: 10
+
+# 토큰 파일 경로 변수 설정
+k3s_config_dir: "/etc/rancher/k3s"
+k3s_token_file: "/var/lib/rancher/k3s/server/node-token"

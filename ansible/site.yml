@@ -1,0 +1,209 @@
+---
+# ===========================================
+# 1. 시간 동기화 (모든 서버)
+# ===========================================
+- name: Configure Time Synchronization
+  hosts: all
+  become: yes
+  tags: [chrony, time-sync]
+  roles:
+    - chrony
+
+# ===========================================
+# 2. K3s Master 설치
+# ===========================================
+- name: Install K3s Master
+  hosts: master
+  become: yes
+  tags: [k3s, k3s-master]
+  roles:
+    - k3s_master
+
+# ===========================================
+# 3. K3s Worker 설치
+# ===========================================
+- name: Install K3s Workers
+  hosts: worker
+  become: yes
+  tags: [k3s, k3s-worker]
+  roles:
+    - k3s_worker
+
+# ===========================================
+# 4. 모니터링 - Node Exporter (K3s 노드)
+# ===========================================
+- name: Install Node Exporter on K3s Nodes
+  hosts: node_exporter
+  become: yes
+  tags: [monitoring, node-exporter]
+  roles:
+    - node_exporter
+
+# ===========================================
+# 5. 모니터링 - Full Stack (모니터링 서버)
+# ===========================================
+- name: Install Monitoring Stack (Prometheus + Grafana)
+  hosts: monitoring
+  become: yes
+  tags: [monitoring, monitoring-stack]
+  roles:
+    - monitoring
+
+# ===========================================
+# 6. 클러스터 검증 및 테스트
+# ===========================================
+- name: Verify K3s Cluster
+  hosts: master
+  become: yes
+  tags: [verify]
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+    
+  tasks:
+    - name: Wait for all nodes to be ready
+      shell: |
+        kubectl get nodes --no-headers | grep -v NotReady | wc -l
+      register: ready_nodes
+      until: ready_nodes.stdout | int == 3
+      retries: 20
+      delay: 10
+      changed_when: false
+
+    - name: Get cluster status
+      command: kubectl get nodes -o wide
+      register: cluster_status
+      changed_when: false
+
+    - name: Display cluster status
+      debug:
+        msg: "{{ cluster_status.stdout_lines }}"
+
+    - name: Get pods in all namespaces
+      command: kubectl get pods -A
+      register: all_pods
+      changed_when: false
+
+    - name: Display all pods
+      debug:
+        msg: "{{ all_pods.stdout_lines }}"
+
+    - name: Run deployment test (Nginx)
+      shell: |
+        kubectl create deployment nginx-test --image=nginx:latest --replicas=2
+        kubectl wait --for=condition=available --timeout=60s deployment/nginx-test
+      register: test_deploy
+      changed_when: false
+      ignore_errors: yes
+
+    - name: Clean up test deployment
+      command: kubectl delete deployment nginx-test
+      when: test_deploy is success
+      changed_when: false
+
+    - name: Success message
+      debug:
+        msg: "K3s cluster is fully operational with {{ ready_nodes.stdout }} nodes! (1 Master, 2 Workers)"
+
+# ===========================================
+# 7. 모니터링 검증
+# ===========================================
+- name: Verify Monitoring Stack
+  hosts: monitoring
+  become: yes
+  tags: [verify, verify-monitoring]
+  tasks:
+    - name: Wait for Prometheus to be ready
+      uri:
+        url: http://localhost:9090/-/ready
+        status_code: 200
+      register: prometheus_ready
+      until: prometheus_ready.status == 200
+      retries: 10
+      delay: 5
+      ignore_errors: yes
+
+    - name: Wait for Grafana to be ready
+      uri:
+        url: http://localhost:3000/api/health
+        status_code: 200
+      register: grafana_ready
+      until: grafana_ready.status == 200
+      retries: 10
+      delay: 5
+      ignore_errors: yes
+
+    - name: Check Node Exporter on monitoring server
+      uri:
+        url: http://localhost:9100/metrics
+        status_code: 200
+      register: node_exporter_ready
+      ignore_errors: yes
+
+    - name: Get monitoring stack status
+      command: docker compose ps
+      args:
+        chdir: /opt/monitoring
+      register: monitoring_status
+      changed_when: false
+
+    - name: Display monitoring status
+      debug:
+        msg: "{{ monitoring_status.stdout_lines }}"
+
+    - name: Get public IP for access URLs
+      set_fact:
+        monitoring_public_ip: "{{ ansible_host }}"
+
+    - name: Success message
+      debug:
+        msg: |
+          ✅ Monitoring Stack is ready!
+          
+          📊 Access URLs:
+          - Grafana:    http://{{ monitoring_public_ip }}:3000 (admin/admin)
+          - Prometheus: http://{{ monitoring_public_ip }}:9090
+          - Node Export: http://{{ monitoring_public_ip }}:9100/metrics
+
+# ===========================================
+# 매뉴얼 및 트러블슈팅 가이드
+# ===========================================
+# === ■ 전체 설치 ===
+# ansible-playbook -i inventory/aws.ini site.yml
+#
+# === ■ 단계별 설치 ===
+# Step 1: 시간 동기화 (전체 4대)
+# ansible-playbook -i inventory/aws.ini site.yml --tags chrony
+#
+# Step 2: Master 설치 (1대)
+# ansible-playbook -i inventory/aws.ini site.yml --tags k3s-master
+#
+# Step 3: Worker 설치 (2대)
+# ansible-playbook -i inventory/aws.ini site.yml --tags k3s-worker
+#
+# Step 4: K3s 노드에 Node Exporter 설치 (3대: Master + Workers)
+# ansible-playbook -i inventory/aws.ini site.yml --tags node-exporter
+#
+# Step 5: 모니터링 서버에 전체 스택 설치 (1대)
+# ansible-playbook -i inventory/aws.ini site.yml --tags monitoring-stack
+#
+# Step 6: 클러스터 상태 검증
+# ansible-playbook -i inventory/aws.ini site.yml --tags verify
+#
+# Step 7: 모니터링 스택 검증
+# ansible-playbook -i inventory/aws.ini site.yml --tags verify-monitoring
+#
+# === ■ 모니터링만 설치 (K3s 건드리지 않음) ===
+# ansible-playbook -i inventory/aws.ini site.yml --tags monitoring
+#
+# === ■ 트러블슈팅 ===
+# 특정 Worker만 재설치 (예: IP가 10.0.3.10 인 경우)
+# ansible-playbook -i inventory/aws.ini site.yml --tags k3s-worker --limit 10.0.3.10
+#
+# 모니터링 서버만 재설치
+# ansible-playbook -i inventory/aws.ini site.yml --tags monitoring-stack
+#
+# 특정 Worker의 Node Exporter만 재설치
+# ansible-playbook -i inventory/aws.ini site.yml --tags node-exporter --limit 10.0.3.10
+#
+# === ■ 모니터링 접속 정보 확인 ===
+# ansible monitoring -i inventory/aws.ini -m debug -a "var=ansible_host"

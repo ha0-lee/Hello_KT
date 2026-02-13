@@ -1,0 +1,6 @@
+---
+- name: restart node-exporter
+  community.docker.docker_container:
+    name: node-exporter
+    state: started
+    restart: yes

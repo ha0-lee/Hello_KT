@@ -1,0 +1,39 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'k3s-production'
+    monitor: 'main-monitoring'
+
+scrape_configs:
+  # Prometheus 자기 자신
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # 모니터링 서버의 Node Exporter
+  - job_name: 'monitoring-server'
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          instance: 'monitoring-server'
+
+  # K3s Master Node
+  - job_name: 'k3s-master'
+    static_configs:
+      - targets:
+{% for host in groups['master'] %}
+        - '{{ host }}:9100'
+{% endfor %}
+        labels:
+          role: 'master'
+
+  # K3s Worker Nodes
+  - job_name: 'k3s-workers'
+    static_configs:
+      - targets:
+{% for host in groups['worker'] %}
+        - '{{ host }}:9100'
+{% endfor %}
+        labels:
+          role: 'worker'

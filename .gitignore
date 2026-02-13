@@ -1,4 +1,21 @@
+# Security keys 
 *.pem
 *.key
+
+# aws.ini
 /inventory
+
+# OS metadata
 .DS_Store
+
+# Terraform files
+*.tfstate
+*.tfstate.*
+
+.terraform/
+
+.terraform.lock.hcl
+crash.log
+
+*.tfvars
+*.tfvars.json

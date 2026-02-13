@@ -1,0 +1,65 @@
+---
+# 모니터링 서버에 Prometheus + Grafana + Node Exporter 설치
+
+- name: Docker 설치 여부 확인
+  command: docker --version
+  register: docker_check
+  failed_when: false
+  changed_when: false
+
+- name: Docker 미설치 시 설치
+  block:
+    - name: Docker 설치 스크립트 다운로드
+      get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
+
+    - name: Docker 설치
+      command: sh /tmp/get-docker.sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Docker 서비스 시작 및 활성화
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: ubuntu 사용자 docker 그룹 추가
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+  when: docker_check.rc != 0
+
+- name: 모니터링 디렉토리 생성
+  file:
+    path: /opt/monitoring
+    state: directory
+    mode: '0755'
+
+- name: Prometheus 설정 디렉토리 생성
+  file:
+    path: /opt/monitoring/prometheus
+    state: directory
+    mode: '0755'
+
+- name: Prometheus 설정 파일 복사
+  template:
+    src: prometheus.yml.j2
+    dest: /opt/monitoring/prometheus/prometheus.yml
+    mode: '0644'
+  notify: restart monitoring stack
+
+- name: docker-compose 파일 복사
+  template:
+    src: docker-compose.yml.j2
+    dest: /opt/monitoring/docker-compose.yml
+    mode: '0644'
+  notify: restart monitoring stack
+
+- name: 모니터링 스택 실행
+  command: docker compose up -d
+  args:
+    chdir: /opt/monitoring

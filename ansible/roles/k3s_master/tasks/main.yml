@@ -1,0 +1,99 @@
+---
+# 1. 설치 전 상태 확인 및 스크립트 준비
+- name: Check if K3s is already installed
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_installed
+
+- name: Download K3s installation script
+  get_url:
+    url: "{{ k3s_install_url | default('https://get.k3s.io') }}"
+    dest: /tmp/k3s-install.sh
+    mode: '0755'
+  when: not k3s_installed.stat.exists
+  retries: 3
+  delay: 10
+
+# 2. K3s Master(Server) 설치 실행
+- name: Install K3s server
+  shell: |
+    INSTALL_K3S_VERSION="{{ k3s_version }}" \
+    sh /tmp/k3s-install.sh server {{ k3s_server_options | join(' ') }}
+  args:
+    creates: /usr/local/bin/k3s
+  register: k3s_install
+  until: k3s_install is succeeded
+  retries: 3
+  delay: 15
+  notify: Restart k3s
+
+# 3. 서비스 안정화 대기
+- name: Wait for K3s API Server (6443) to be ready
+  wait_for:
+    port: 6443
+    delay: 10
+    timeout: 300 
+
+- name: Wait for node-token file to be generated
+  wait_for:
+    path: "{{ k3s_token_file }}"
+    timeout: 60
+
+# 4. 워커 노드를 위한 정보 추출 및 공유
+- name: Read K3s node token
+  slurp:
+    src: "{{ k3s_token_file }}"
+  register: k3s_token_raw
+
+- name: Set K3s facts and share with Workers
+  block:
+    - name: Set local facts
+      set_fact:
+        k3s_master_token: "{{ k3s_token_raw.content | b64decode | trim }}"
+        k3s_master_ip: "{{ ansible_default_ipv4.address }}"
+
+    - name: Share information via dummy host (Safe way)
+      add_host:
+        name: "K3S_INFO_HOLDER"
+        token: "{{ k3s_master_token }}"
+        master_ip: "{{ k3s_master_ip }}"
+
+# 5. 사용자 편의성 설정 (kubectl 사용 환경)
+- name: Setup kubeconfig for ubuntu user
+  block:
+    - name: Create .kube directory
+      file:
+        path: "/home/ubuntu/.kube"
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0755' 
+
+    - name: Copy and set permissions for kubeconfig
+      copy:
+        src: "/etc/rancher/k3s/k3s.yaml"
+        dest: "/home/ubuntu/.kube/config"
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
+        remote_src: yes
+    - name: Add KUBECONFIG to bashrc
+      lineinfile:
+        path: "/home/ubuntu/.bashrc"
+        line: 'export KUBECONFIG=/home/ubuntu/.kube/config'
+        insertafter: EOF 
+
+# 6. 최종 설치 검증
+- name: Verify cluster status
+  command: /usr/local/bin/kubectl get nodes
+  register: nodes_check
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  until: nodes_check.rc == 0
+  retries: 5
+  delay: 10
+  changed_when: false 
+
+- name: Display K3s Nodes
+  debug:
+    var: nodes_check.stdout_lines

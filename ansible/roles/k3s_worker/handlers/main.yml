@@ -1,0 +1,20 @@
+---
+# 1. 커널 파라미터 적용 핸들러 (네트워크 설정 즉시 반영)
+- name: Reload sysctl
+  command: sysctl --system
+  become: yes
+
+# 2. K3s Worker(Agent) 서비스 재시작 핸들러 
+- name: Restart k3s-agent
+  systemd:
+    name: k3s-agent
+    state: restarted
+    daemon_reload: yes
+  become: yes
+
+# 3. K3s Worker(Agent) 설정 리로드 핸들러
+- name: Reload k3s-agent configuration
+  systemd:
+    name: k3s-agent
+    state: reloaded
+  become: yes
