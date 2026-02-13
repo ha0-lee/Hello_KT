@@ -2,10 +2,8 @@
 *.pem
 *.key
 
-# aws.ini
-/inventory
+ansible/inventory/
 
-# OS metadata
 .DS_Store
 
 # Terraform files
