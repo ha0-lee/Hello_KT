@@ -142,6 +142,18 @@ resource "aws_instance" "monitoring_server" {
   }
 }
 
+# 146 ~ 154 한정현 30080 포트 인바인드 규칙 추가
+resource "aws_security_group_rule" "open_lunch_nodeport_public" {
+  type              = "ingress"
+  from_port         = 30080
+  to_port           = 30080
+  protocol          = "tcp"
+  security_group_id = aws_security_group.web_sg.id
+  cidr_blocks       = ["0.0.0.0/0"]
+  description       = "Open Lunch NodePort 30080 to public"
+}
+
+
 # 1. 모니터링 서버용 역할
 resource "aws_iam_role" "monitoring_role" {
   name = "monitoring_server_role"

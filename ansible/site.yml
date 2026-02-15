@@ -165,6 +165,18 @@
           - Node Export: http://{{ monitoring_public_ip }}:9100/metrics
 
 # ===========================================
+# 8. Lunch App 배포 (GHCR → K3s)
+# ===========================================
+- name: Deploy Lunch App to K3s
+  hosts: master
+  become: yes
+  tags: [app, deploy]
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  roles:
+    - app_deploy
+
+# ===========================================
 # 매뉴얼 및 트러블슈팅 가이드
 # ===========================================
 # === ■ 전체 설치 ===

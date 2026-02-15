@@ -1,0 +1,71 @@
+---
+- name: Create namespace (lunch)
+  shell: |
+    cat <<'YAML' | kubectl apply -f -
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: lunch
+    YAML
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Deploy lunch-api (Deployment)
+  shell: |
+    cat <<'YAML' | kubectl apply -f -
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: lunch-api
+      namespace: lunch
+    spec:
+      replicas: 2
+      selector:
+        matchLabels:
+          app: lunch-api
+      template:
+        metadata:
+          labels:
+            app: lunch-api
+        spec:
+          containers:
+            - name: lunch-api
+              image: ghcr.io/hjh6709/lunch-api:latest
+              imagePullPolicy: Always
+              ports:
+                - containerPort: 8000
+    YAML
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Expose lunch-api (NodePort 30080)
+  shell: |
+    cat <<'YAML' | kubectl apply -f -
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: lunch-api
+      namespace: lunch
+    spec:
+      selector:
+        app: lunch-api
+      type: NodePort
+      ports:
+        - name: http
+          port: 80
+          targetPort: 8000
+          nodePort: 30080
+    YAML
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait rollout
+  command: kubectl -n lunch rollout status deploy/lunch-api --timeout=180s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Show status
+  command: kubectl -n lunch get po,svc -o wide
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
