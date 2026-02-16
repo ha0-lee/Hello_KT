@@ -1,0 +1,14 @@
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.zip
+terraform.tfvars  
+
+# fastapi cache
+__pycache__/
+
+ansible/key/Hello_kt.pem
+
+Hello_kt.pem
+
+.DS_Store
