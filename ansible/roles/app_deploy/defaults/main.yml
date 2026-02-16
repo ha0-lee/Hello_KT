@@ -13,3 +13,7 @@ container_port: 8000
 service_type: NodePort
 service_port: 80
 node_port: 30080
+
+# 추후 교체 예정 (ALB/Ingress) 생각한다면
+# service_type: ClusterIP
+# node_port: 30080   # NodePort 쓸 때만 켜기

@@ -11,4 +11,6 @@ spec:
     - name: http
       port: {{ service_port }}
       targetPort: {{ container_port }}
+{% if service_type == 'NodePort' %}
       nodePort: {{ node_port }}
+{% endif %}
