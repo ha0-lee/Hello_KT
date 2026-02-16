@@ -1,8 +1,0 @@
-# ■ Ansible 관련 ■
-
-# Keys 
-*.pem
-*.key
-
-# OS
-.DS_Store
