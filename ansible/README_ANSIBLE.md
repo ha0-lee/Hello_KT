@@ -22,6 +22,27 @@
   - `k3s_master` 주요 동작: 설치 스크립트 다운로드, k3s 서버 설치, 토큰 추출 및 `KUBECONFIG` 설정, `/usr/local/bin/kubectl get nodes`로 기본 검증
   - `k3s_worker` 주요 동작: 마스터로부터 토큰/엔드포인트 획득, 에이전트 설치, 서비스 활성화 및 포트/파일 체크로 검증
   - 공통: swap 비활성화, 필요한 커널 모듈 적재(overlay, br_netfilter), sysctl 설정
+  - 
+- **`app_deploy`** (`민수/ansible/roles/app_deploy`):
+  - 목적: GHCR에 푸시된 Lunch API 이미지를 K3s 클러스터에 배포
+  - 주요 동작:
+    - Namespace(`lunch`) 생성
+    - Deployment(`lunch-api`) 생성 (replicas: 2)
+    - NodePort Service 생성 (기본: 30080)
+    - `kubectl rollout status`로 배포 완료 대기
+    - Pod/Service 상태 출력
+  - 기본 설정값:
+    - Image: `ghcr.io/hjh6709/lunch_app_second/lunch-api:latest`
+    - Container Port: 8000
+    - Service Type: NodePort
+    - NodePort: 30080
+  - 검증 방법:
+    ```bash
+    kubectl -n lunch get deploy,svc,pods -o wide
+    ```
+  - 비고:
+    - 현재 NodePort 방식은 외부 접속 테스트용 구성
+    - 추후 ALB/Ingress 기반 구조로 전환 가능
 
 ## 핸들러(Handlers)
 - 역할별 핸들러들은 설정 변경 시 서비스를 안전하게 재시작하거나 설정을 리로드합니다. 예:
