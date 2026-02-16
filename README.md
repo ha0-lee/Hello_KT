@@ -99,3 +99,46 @@ kubectl get nodes
 
 ---
 작성자: 정리 자동화 — 현재 워크스페이스 기반 요약
+
+# 정현 작업 기록
+
+## `app_deploy` 역할 세부
+
+- **목적**:  
+  K3s 클러스터에 Lunch API 애플리케이션을 배포하기 위한 Ansible 역할입니다.  
+  GitHub Container Registry(GHCR)에 푸시된 이미지를 사용하여 Deployment와 Service를 생성합니다.
+
+- **주요 파일**:
+  - [민수/ansible/roles/app_deploy/tasks/main.yml]  
+    — Namespace 생성, Deployment/Service 템플릿 렌더링, kubectl apply, rollout 대기 및 상태 출력 수행
+  - [민수/ansible/roles/app_deploy/templates/deployment.yaml.j2]  
+    — Deployment 매니페스트 템플릿
+  - [민수/ansible/roles/app_deploy/templates/service.yaml.j2]  
+    — Service 매니페스트 템플릿 (NodePort 조건부 적용)
+  - [민수/ansible/roles/app_deploy/templates/namespace.yaml.j2]  
+    — Namespace 생성 템플릿
+  - [민수/ansible/roles/app_deploy/defaults/main.yml]  
+    — 앱 이름, 이미지, 포트, replicas 등 기본 변수 정의
+
+- **동작 요약**:
+  1. `/opt/lunch-app-k8s` 디렉터리에 Kubernetes 매니페스트 파일 생성
+  2. Namespace 생성 (`lunch`)
+  3. GHCR 이미지 기반 Deployment 생성
+  4. NodePort 방식 Service 생성 (기본: 30080)
+  5. `kubectl rollout status`로 배포 완료까지 대기
+  6. 배포 완료 후 Pod/Service 상태 출력
+
+- **현재 기본 설정값**:
+  - Namespace: `lunch`
+  - Deployment 이름: `lunch-api`
+  - Replicas: 2
+  - Container Port: 8000
+  - Image: `ghcr.io/hjh6709/lunch_app_second/lunch-api:latest`
+  - Service Type: NodePort
+  - NodePort: 30080
+
+- **검증 방법**:
+  - 플레이북 실행 후 다음 명령으로 배포 상태 확인:
+
+  ```bash
+  kubectl -n lunch get deploy,svc,pods -o wide
