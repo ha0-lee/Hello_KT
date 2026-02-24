@@ -6,34 +6,33 @@ global:
     monitor: 'main-monitoring'
 
 scrape_configs:
-  # Prometheus 자기 자신
+  # 1. Prometheus 자기 자신 모니터링
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
 
-  # 모니터링 서버의 Node Exporter
-  - job_name: 'monitoring-server'
-    static_configs:
-      - targets: ['node-exporter:9100']
-        labels:
-          instance: 'monitoring-server'
+  # 2. AWS EC2 자동 탐지 (Node Exporter용)
+  - job_name: 'ec2-nodes'
+    ec2_sd_configs:
+      - region: ap-northeast-2
+        port: 9100
+    relabel_configs:
+      # AWS Name 태그를 인스턴스 이름으로 사용
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: instance
+      # Role 태그가 master, worker, monitoring인 것만 수집        
+      - source_labels: [__meta_ec2_tag_Role]
+        regex: (master|worker|monitoring)
+        action: keep
 
-  # K3s Master Node
-  - job_name: 'k3s-master'
-    static_configs:
-      - targets:
-{% for host in groups['master'] %}
-        - '{{ host }}:9100'
-{% endfor %}
-        labels:
-          role: 'master'
-
-  # K3s Worker Nodes
-  - job_name: 'k3s-workers'
-    static_configs:
-      - targets:
-{% for host in groups['worker'] %}
-        - '{{ host }}:9100'
-{% endfor %}
-        labels:
-          role: 'worker'
+  # 3. AWS EC2 자동 탐지 (cAdvisor - 컨테이너 모니터링용)
+  - job_name: 'ec2-cadvisor'
+    ec2_sd_configs:
+      - region: ap-northeast-2
+        port: 8080
+    relabel_configs:
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: instance
+      - source_labels: [__meta_ec2_tag_Role]
+        regex: (master|worker|monitoring)
+        action: keep

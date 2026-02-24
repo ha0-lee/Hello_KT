@@ -4,3 +4,13 @@
     name: node-exporter
     state: started
     restart: yes
+
+
+#바뀐 부분 
+- name: restart cadvisor
+  community.docker.docker_container:
+    name: cadvisor
+    image: gcr.io/cadvisor/cadvisor:latest
+    state: started
+    restart: yes
+ 

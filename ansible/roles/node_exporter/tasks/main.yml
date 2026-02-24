@@ -45,3 +45,23 @@
     pid_mode: host
     volumes:
       - '/:/host:ro,rslave'
+
+#바뀐 부분 
+- name: cAdvisor 컨테이너 실행
+  community.docker.docker_container:
+    name: cadvisor
+    image: gcr.io/cadvisor/cadvisor:latest
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:ro"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
+      - "/dev/disk/:/dev/disk:ro"
+    devices:
+      - "/dev/kmsg"
+    # cAdvisor가 시스템 메트릭에 접근하기 위해 가끔 필요
+    privileged: true

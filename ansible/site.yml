@@ -32,7 +32,7 @@
 # 4. 모니터링 - Node Exporter (K3s 노드)
 # ===========================================
 - name: Install Node Exporter on K3s Nodes
-  hosts: node_exporter
+  hosts: all:!monitoring   # -> master, worker monitoring
   become: yes
   tags: [monitoring, node-exporter]
   roles:
@@ -142,6 +142,19 @@
         status_code: 200
       register: node_exporter_ready
       ignore_errors: yes
+    
+    # 추가된 부분 
+    # --- cAdvisor 검증 추가 ---
+    - name: Wait for cAdvisor to be ready
+      uri:
+        url: http://localhost:8080/metrics
+        status_code: 200
+      register: cadvisor_ready
+      until: cadvisor_ready.status == 200
+      retries: 10
+      delay: 5
+      ignore_errors: yes
+
 
     - name: Get monitoring stack status
       command: docker compose ps
@@ -167,6 +180,7 @@
           - Grafana:    http://{{ monitoring_public_ip }}:3000 (admin/admin)
           - Prometheus: http://{{ monitoring_public_ip }}:9090
           - Node Export: http://{{ monitoring_public_ip }}:9100/metrics
+          - cAdvisor:   http://{{ ansible_host }}:8080
 
 # ===========================================
 # 8. Lunch App 배포 (GHCR → K3s)

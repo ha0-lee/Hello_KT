@@ -12,6 +12,23 @@ services:
     pid: host
     volumes:
       - '/:/host:ro,rslave'
+  # 추가한 부분 
+  # --- cAdvisor 추가 시작 ---
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    restart: unless-stopped
+    devices:
+      - /dev/kmsg  # 로그 수집을 위해 필요합니다
+  # --- cAdvisor 추가 끝 ---
 
   prometheus:
     image: prom/prometheus:latest
