@@ -23,7 +23,7 @@ worker
 # ===== Global Variables =====
 [all:vars]
 ansible_user=ubuntu
-ansible_ssh_private_key_file=${abspath(path.module)}/../ansible/key/Hello_kt.pem
+ansible_ssh_private_key_file=./key/Hello_kt.pem
 ansible_python_interpreter=/usr/bin/python3
 ansible_ssh_common_args='-o StrictHostKeyChecking=no'
 
