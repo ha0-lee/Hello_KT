@@ -1,8 +1,19 @@
-# ■ Ansible 관련 ■
-
-# Keys 
+# Security keys 
 *.pem
 *.key
 
-# OS
+ansible/inventory/
+
 .DS_Store
+
+# Terraform files
+*.tfstate
+*.tfstate.*
+
+.terraform/
+
+.terraform.lock.hcl
+crash.log
+
+*.tfvars
+*.tfvars.json
