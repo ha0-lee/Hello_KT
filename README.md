@@ -38,11 +38,13 @@ app/
 └── static/        # 정적 파일 (index.html 등)
 🚀 주요 기능
 1️⃣ 루트 페이지
+
 GET /
 
 static/index.html 반환
 
 2️⃣ 헬스 체크
+
 GET /health
 
 응답 예시:
@@ -56,6 +58,7 @@ Kubernetes Liveness/Readiness Probe용
 ALB Target Group 헬스체크용
 
 3️⃣ 랜덤 추천
+
 GET /api/random
 
 응답 예시:
@@ -64,6 +67,7 @@ GET /api/random
   "menu": "김치찌개"
 }
 4️⃣ 전체 메뉴 조회
+
 GET /api/menus
 
 응답 예시:
@@ -73,7 +77,9 @@ GET /api/menus
   "menus": ["김치찌개", "돈까스", "비빔밥"]
 }
 5️⃣ 룰렛 방식 추천
+
 GET /api/spin
+
 Query Parameters
 Parameter	Description
 seed	동일 seed 입력 시 동일 결과
