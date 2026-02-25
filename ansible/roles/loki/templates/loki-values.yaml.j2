@@ -1,0 +1,18 @@
+loki:
+  enabled: true
+
+  image:
+    repository: grafana/loki
+    tag: "2.9.3"  # 최신 chart 기준 안정 버전
+    pullPolicy: IfNotPresent
+
+  persistence:
+    enabled: false
+
+  service:
+    type: NodePort
+    nodePort: 32000
+
+promtail:
+  enabled: true
+

@@ -56,6 +56,17 @@
   tags: [monitoring, ksm]
   roles:
     - kube_state_metrics
+# ===========================================
+# 6-1. Loki 배포 (K3s 클러스터 내부)
+# ===========================================
+- name: Deploy Loki to K3s Cluster
+  hosts: master
+  become: yes
+  tags: [monitoring, loki]
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  roles:
+    - loki
 
 # ===========================================
 # 7. 클러스터 검증 및 테스트
@@ -264,4 +275,21 @@
 #
 # 3) KSM 포트 충돌 확인 (Worker 노드에서 실행)
 # netstat -tulpn | grep 30081
+#
+# === ■ Loki (로그 모니터링) 관련 ===
+#
+# 1) Loki만 재배포 (설정 변경 또는 재설치 시)
+# ansible-playbook -i inventory/aws.ini site.yml --tags loki
+#
+# 2) Loki 배포 및 K3s 내 Pod 상태 즉시 확인
+# ansible-playbook -i inventory/aws.ini site.yml --tags loki --limit master
+# (Master 노드에서 kubectl을 통해 배포되므로 master 그룹으로 한정 가능)
+#
+# 3) Loki 서비스 포트 및 접속 확인 (Master 노드 실행)
+# kubectl get svc -n monitoring | grep loki
+#
+# 4) Loki 로그 수집 상태 확인 (Grafana Explore 탭에서 테스트)
+# Grafana 접속 후 Data Source에 http://loki:3100 (내부 DNS) 또는 해당 IP 등록 확인
+#
+
 
