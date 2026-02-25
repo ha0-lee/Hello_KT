@@ -1,0 +1,30 @@
+---
+- name: Install chrony
+  apt:
+    name: chrony
+    state: present
+    update_cache: yes
+
+- name: Deploy chrony configuration
+  template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart chrony
+
+- name: Start and enable chrony service
+  systemd:
+    name: chrony
+    enabled: yes
+    state: started
+
+- name: Verify chrony is running
+  command: chronyc tracking
+  register: chrony_status
+  changed_when: false
+
+- name: Display chrony sync status
+  debug:
+    msg: "{{ chrony_status.stdout_lines }}"

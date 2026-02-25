@@ -1,0 +1,51 @@
+---
+- name: Create temp dir for k8s manifests
+  file:
+    path: /opt/lunch-app-k8s
+    state: directory
+    mode: "0755"
+
+- name: Render namespace manifest
+  template:
+    src: namespace.yaml.j2
+    dest: /opt/lunch-app-k8s/namespace.yaml
+    mode: "0644"
+
+- name: Render deployment manifest
+  template:
+    src: deployment.yaml.j2
+    dest: /opt/lunch-app-k8s/deployment.yaml
+    mode: "0644"
+
+- name: Render service manifest
+  template:
+    src: service.yaml.j2
+    dest: /opt/lunch-app-k8s/service.yaml
+    mode: "0644"
+
+- name: Apply namespace
+  command: kubectl apply -f /opt/lunch-app-k8s/namespace.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Apply deployment
+  command: kubectl apply -f /opt/lunch-app-k8s/deployment.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Apply service
+  command: kubectl apply -f /opt/lunch-app-k8s/service.yaml
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for deployment rollout
+  command: kubectl -n {{ app_namespace }} rollout status deployment/{{ app_name }} --timeout=120s
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Show resources
+  command: kubectl -n {{ app_namespace }} get deploy,svc,pods -o wide
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
