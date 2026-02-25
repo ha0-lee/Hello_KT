@@ -33,9 +33,9 @@ Infra: AWS (EC2, VPC, NAT, Bastion)
 
 📂 프로젝트 구조
 app/
- ├── main.py        # FastAPI 애플리케이션
- ├── menus.json     # 메뉴 데이터
- └── static/        # 정적 파일 (index.html 등)
+├── main.py        # FastAPI 애플리케이션
+├── menus.json     # 메뉴 데이터
+└── static/        # 정적 파일 (index.html 등)
 🚀 주요 기능
 1️⃣ 루트 페이지
 GET /
@@ -75,7 +75,7 @@ GET /api/menus
 5️⃣ 룰렛 방식 추천
 GET /api/spin
 Query Parameters
-파라미터	설명
+Parameter	Description
 seed	동일 seed 입력 시 동일 결과
 ticks	룰렛 회전 횟수 (5~60)
 
@@ -86,25 +86,6 @@ ticks	룰렛 회전 횟수 (5~60)
   "ticks": ["비빔밥", "라면", "김밥", "돈까스"],
   "duration_ms": 3
 }
-🎯 설계 포인트
-✅ Seed 기반 랜덤 처리
-
-테스트 환경에서 동일 결과 재현 가능
-
-해시 기반 시드 처리로 안정성 확보
-
-✅ Health Endpoint 제공
-
-Kubernetes 운영 환경 고려
-
-ALB 헬스체크 대응 가능
-
-✅ Static + API 통합
-
-단일 컨테이너로 프론트/백엔드 제공
-
-배포 단순화
-
 🐳 Docker 실행 방법
 docker build -t lunch-app .
 docker run -p 8000:8000 lunch-app
