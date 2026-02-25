@@ -63,9 +63,6 @@ GET /api/random
 {
   "menu": "김치찌개"
 }
-
-메뉴 중 하나를 랜덤으로 반환
-
 4️⃣ 전체 메뉴 조회
 GET /api/menus
 
