@@ -95,6 +95,15 @@ resource "aws_security_group_rule" "master_to_worker_cAvisor" {
   source_security_group_id = aws_security_group.monitoring_sg.id
   description              = "Prometheus to Worker CAdvisor"
 }
+resource "aws_security_group_rule" "monitoring_to_ksm" {
+  type                     = "ingress"
+  from_port                = 8081
+  to_port                  = 8081 # 8080에서 8081로 변경
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.web_sg.id
+  source_security_group_id = aws_security_group.monitoring_sg.id
+  description              = "Prometheus to Kube-state-metrics"
+}
 resource "aws_security_group_rule" "master_to_worker_kubelet" {
   type                     = "ingress"
   from_port                = 10250
