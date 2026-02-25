@@ -32,7 +32,7 @@
 # 4. 모니터링 - Node Exporter (K3s 노드)
 # ===========================================
 - name: Install Node Exporter on K3s Nodes
-  hosts: all:!monitoring   # -> master, worker monitoring
+  hosts: all:!monitoring   # -> master, worker monitoring 
   become: yes
   tags: [monitoring, node-exporter]
   roles:
@@ -47,9 +47,18 @@
   tags: [monitoring, monitoring-stack]
   roles:
     - monitoring
+# ===========================================
+# 6. 모니터링 - Kube-state-metrics (K3s 클러스터 내부)
+# ===========================================
+- name: Deploy Kube-state-metrics to K3s Cluster
+  hosts: master
+  become: yes
+  tags: [monitoring, ksm]
+  roles:
+    - kube_state_metrics
 
 # ===========================================
-# 6. 클러스터 검증 및 테스트
+# 7. 클러스터 검증 및 테스트
 # ===========================================
 - name: Verify K3s Cluster
   hosts: master
@@ -109,7 +118,7 @@
         msg: "K3s cluster is fully operational with {{ ready_nodes.stdout }} nodes! (1 Master, 2 Workers)"
 
 # ===========================================
-# 7. 모니터링 검증
+# 8. 모니터링 검증
 # ===========================================
 - name: Verify Monitoring Stack
   hosts: monitoring
@@ -142,8 +151,7 @@
         status_code: 200
       register: node_exporter_ready
       ignore_errors: yes
-    
-    # 추가된 부분 
+
     # --- cAdvisor 검증 추가 ---
     - name: Wait for cAdvisor to be ready
       uri:
@@ -154,7 +162,6 @@
       retries: 10
       delay: 5
       ignore_errors: yes
-
 
     - name: Get monitoring stack status
       command: docker compose ps
@@ -170,6 +177,14 @@
     - name: Get public IP for access URLs
       set_fact:
         monitoring_public_ip: "{{ ansible_host }}"
+    # --- KSM 검증  추가 ---
+    - name: Check Kube-state-metrics on Worker Nodes
+      uri:
+        url: "http://{{ item }}:30081/metrics"
+        status_code: 200
+      loop: "{{ groups['worker'] }}"  # 인벤토리의 worker 그룹 IP들 순회
+      register: ksm_verify
+      ignore_errors: yes
 
     - name: Success message
       debug:
@@ -181,9 +196,10 @@
           - Prometheus: http://{{ monitoring_public_ip }}:9090
           - Node Export: http://{{ monitoring_public_ip }}:9100/metrics
           - cAdvisor:   http://{{ ansible_host }}:8080
+          - KSM:        http://{{ groups['worker'][0] }}:30081/metrics
 
 # ===========================================
-# 8. Lunch App 배포 (GHCR → K3s)
+# 9. Lunch App 배포 (GHCR → K3s)
 # ===========================================
 - name: Deploy Lunch App to K3s
   hosts: master
@@ -237,3 +253,15 @@
 #
 # === ■ 모니터링 접속 정보 확인 ===
 # ansible monitoring -i inventory/aws.ini -m debug -a "var=ansible_host"
+#
+# === ■ Kube-state-metrics (KSM) 관련 ===
+#
+# 1) KSM만 재배포 (설정 변경 시)
+# ansible-playbook -i inventory/aws.ini site.yml --tags ksm
+#
+# 2) KSM 재배포 및 동작 즉시 검증
+# ansible-playbook -i inventory/aws.ini site.yml --tags ksm,verify-monitoring
+#
+# 3) KSM 포트 충돌 확인 (Worker 노드에서 실행)
+# netstat -tulpn | grep 30081
+

@@ -20,7 +20,7 @@ scrape_configs:
       # AWS Name 태그를 인스턴스 이름으로 사용
       - source_labels: [__meta_ec2_tag_Name]
         target_label: instance
-      # Role 태그가 master, worker, monitoring인 것만 수집        
+      # Role 태그가 master, worker, monitoring인 것만 수집
       - source_labels: [__meta_ec2_tag_Role]
         regex: (master|worker|monitoring)
         action: keep
@@ -36,3 +36,17 @@ scrape_configs:
       - source_labels: [__meta_ec2_tag_Role]
         regex: (master|worker|monitoring)
         action: keep
+
+  # 4. AWS EC2 자동 탐지 (Kube-state-metrics 모니터링용)
+  - job_name: 'ec2-ksm'
+    ec2_sd_configs:
+      - region: ap-northeast-2
+        port: 30081  # KSM NodePort 번호
+    relabel_configs:
+      - source_labels: [__meta_ec2_tag_Name]
+        target_label: instance
+      # KSM은 보통 master나 worker 노드에서 실행되므로 해당 노드들만 유지
+      - source_labels: [__meta_ec2_tag_Role]
+        regex: (master|worker)
+        action: keep
+
