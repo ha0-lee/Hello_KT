@@ -1,8 +1,14 @@
-# ■ Ansible 관련 ■
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.zip
+terraform.tfvars  
 
-# Keys 
-*.pem
-*.key
+# fastapi cache
+__pycache__/
 
-# OS
+ansible/key/Hello_kt.pem
+
+Hello_kt.pem
+
 .DS_Store
