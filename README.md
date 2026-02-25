@@ -1,160 +1,100 @@
-🚀 Application Deployment Architecture (K3s)
-1. Overview
+# 🍽️ 점메추 (점심 메뉴 추천)
 
-본 프로젝트의 애플리케이션은 K3s 기반 Kubernetes 클러스터에 배포되며,
-외부 사용자는 Monitoring 서버(Reverse Proxy) 를 통해 접근합니다.
+> 오늘 점심 뭐 먹지? 고민은 여기까지만. 버튼 한 번이면 끝.
 
-App Image: GHCR (GitHub Container Registry)
+점심 메뉴 선택 장애를 해결해주는 간단한 웹 서비스입니다.
 
-Deployment 방식: Kubernetes Deployment
+---
 
-Service 타입: NodePort (30080)
+## 주요 기능
 
-Worker Node: 2대 (분산 실행)
+- 그냥 골라줘 — 등록된 메뉴 중 하나를 즉시 랜덤 추천
+- 룰렛으로 고르기 — 메뉴가 빠르게 돌아가다 하나에 멈추는 룰렛 연출
+- Swagger UI — `/docs` 경로에서 API 문서 자동 제공
 
-2. Infrastructure Structure
-Internet
-   │
-   ▼
-Monitoring Server (Public Subnet)
-   - Nginx (Reverse Proxy)
-   - Bastion
-   │
-   ▼
-Private Subnet (K3s Cluster)
-   ├── Master Node (Control Plane)
-   ├── Worker Node 1
-   └── Worker Node 2
+## 기술 스택
 
-Master / Worker는 Private Subnet에 위치
+| 구분 | 기술 |
+|------|------|
+| Backend | FastAPI (Python 3.11) |
+| Server | Uvicorn |
+| Frontend | Vanilla HTML/CSS/JS (단일 파일) |
+| 컨테이너 | **Docker** |
+| CI/CD | **GitHub Actions** → GHCR 자동 푸시 |
 
-외부 노출은 Monitoring Server만 허용
+## 프로젝트 구조
 
-보안그룹을 통해 접근 제어
+```
+Hello_KT/
+├── app/
+│   ├── main.py            # FastAPI 앱 (API 엔드포인트 정의)
+│   ├── menus.json          # 메뉴 데이터 (JSON)
+│   └── static/
+│       └── index.html      # 프론트엔드 (SPA)
+├── .github/
+│   └── workflows/
+│       └── ghcr.yml        # GHCR 빌드/푸시 워크플로우
+├── Dockerfile
+├── requirements.txt
+└── README.md
+```
 
-3. Deployment Flow
-Step 1. Ansible → K3s Master
+## API 엔드포인트
 
-로컬 환경에서 Ansible을 실행하면:
+| Method | Path | 설명 |
+|--------|------|------|
+| `GET` | `/` | 프론트엔드 페이지 |
+| `GET` | `/health` | 헬스체크 (`{"ok": true}`) |
+| `GET` | `/api/menus` | 전체 메뉴 목록 조회 |
+| `GET` | `/api/random` | 메뉴 1개 랜덤 추천 |
+| `GET` | `/api/spin` | 룰렛 결과 + 연출용 tick 데이터 반환 |
 
-Local PC
-   │
-   ▼ (SSH Proxy via Bastion)
-Monitoring Server
-   │
-   ▼
-K3s Master
+### `/api/spin` 파라미터
 
-Ansible app_deploy Role이 다음 리소스를 생성합니다:
+| 파라미터 | 타입 | 기본값 | 설명 |
+|----------|------|--------|------|
+| `seed` | string (optional) | `null` | 동일 seed → 동일 결과 (테스트용) |
+| `ticks` | int | `18` | 룰렛이 지나가는 칸 수 (5~60) |
 
-Namespace
+## 로컬 실행
 
-Deployment
+### Docker (권장)
 
-Service
+```bash
+docker build -t lunch-api .
+docker run -p 8000:8000 lunch-api
+```
 
-Step 2. Kubernetes Deployment
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: lunch-api
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: lunch-api
-  template:
-    metadata:
-      labels:
-        app: lunch-api
-    spec:
-      containers:
-        - name: lunch-api
-          image: ghcr.io/<your-image>
-          ports:
-            - containerPort: 80
+### 직접 실행
 
-replicas: 2
+```bash
+pip install -r requirements.txt
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
 
-GHCR에서 이미지 Pull
+실행 후 http://localhost:8000 접속
 
-Worker 노드 2대에 분산 배치
+## CI/CD
 
-실제 배치 결과
-lunch-api-xxxx   Running   ip-10-0-3-27
-lunch-api-xxxx   Running   ip-10-0-4-185
-4. Service Configuration (NodePort)
-apiVersion: v1
-kind: Service
-metadata:
-  name: lunch-api
-spec:
-  type: NodePort
-  selector:
-    app: lunch-api
-  ports:
-    - port: 80
-      targetPort: 80
-      nodePort: 30080
-의미
+`main` 브랜치에 push하면 GitHub Actions가 자동으로 Docker 이미지를 빌드하여 **GHCR**(GitHub Container Registry)에 푸시합니다.
 
-클러스터 내부 포트: 80
+```
+ghcr.io/<owner>/<repo>/lunch-api:latest
+ghcr.io/<owner>/<repo>/lunch-api:<commit-sha>
+```
 
-각 Worker 노드 외부 포트: 30080
+## 메뉴 커스터마이즈
 
-접근 가능 주소:
+`app/menus.json` 파일을 수정하면 추천 메뉴 목록을 변경할 수 있습니다.
 
-10.0.3.27:30080
-10.0.4.185:30080
-5. External Access Architecture
-
-외부 사용자는 Worker에 직접 접근하지 않습니다.
-
-User Browser
-   │
-   ▼
-http://<Monitoring-Public-IP>
-   │
-   ▼ (Nginx Reverse Proxy)
-10.0.3.27:30080
-10.0.4.185:30080
-   │
-   ▼
-Pod (Container)
-Nginx Upstream Configuration
-upstream lunch_upstream {
-  server 10.0.3.27:30080;
-  server 10.0.4.185:30080;
+```json
+{
+    "version": 1,
+    "menus": [
+        "김치찌개",
+        "돈까스",
+        "제육볶음",
+        "..."
+    ]
 }
-
-server {
-  listen 80;
-
-  location / {
-    proxy_pass http://lunch_upstream;
-  }
-}
-6. Key Characteristics
-🔐 Security
-
-Worker 노드는 Private Subnet
-
-외부 노출은 Monitoring Server만 허용
-
-Security Group으로 NodePort 접근 제한
-
-🔁 High Availability
-
-replicas = 2
-
-Worker 2대에 분산 실행
-
-Worker 1대 장애 시 다른 노드에서 서비스 유지 가능
-
-📦 Container-Based Deployment
-
-GHCR 이미지 사용
-
-Kubernetes Deployment 기반 운영
-
-Infrastructure as Code (Terraform + Ansible)
+```
