@@ -75,7 +75,6 @@ app/
 │
 └─ static/
    └─ index.html            # 프론트엔드 SPA (415줄, HTML+CSS+JS 단일 파일)
-                             # - 다크 글래스모피즘 UI
                              # - "그냥 골라줘" → /api/random 호출
                              # - "룰렛으로 고르기" → /api/spin 호출 + 80ms 간격 애니메이션
                              # - XSS 방지 (escapeHtml), 에러 토스트, 로딩 상태 관리
@@ -250,7 +249,6 @@ HTML + CSS + JavaScript가 단일 파일에 포함된 SPA(Single Page Applicatio
 
 #### UI 디자인
 
-- **다크 테마 글래스모피즘** — 반투명 카드 (`backdrop-filter: blur(14px)`) + 3개 `radial-gradient` 배경 (보라/파랑/초록)
 - **SVG 노이즈 오버레이** — `body:before`에 `feTurbulence` SVG 필터로 미세한 텍스처 적용
 - CSS 변수로 전체 테마 관리 (`--bg1`, `--card`, `--text`, `--muted`, `--line`, `--shadow`, `--radius`)
 - 모바일 반응형 (`@media max-width: 420px` — 카드 패딩, 폰트 크기 축소)
