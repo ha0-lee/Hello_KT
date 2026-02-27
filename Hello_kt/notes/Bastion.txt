@@ -1,0 +1,9 @@
+윈도우에서는  
+.pem 키 권한 설정이 필요
+
+관리자 권한으로 powershell 열어서 
+해당 디렉토리로 이동 후 
+icacls Hello_kt.pem /inheritance:r
+icacls Hello_kt.pem /grant:r "$($env:USERNAME):(R)"
+
+ssh -i Hello_kt.pem ubuntu@x.x.x.x

@@ -1,0 +1,111 @@
+---
+# 1. 시스템 사전 준비 (Master/Worker 공통)
+- name: Disable swap permanently (Required for K3s)
+  shell: |
+    swapoff -a
+    sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+  changed_when: false
+
+- name: Load and persist kernel modules
+  block:
+    - name: Load modules
+      community.general.modprobe:
+        name: "{{ item }}"
+        state: present
+      loop: [overlay, br_netfilter]
+    - name: Ensure modules persist on reboot
+      copy:
+        dest: /etc/modules-load.d/k3s.conf
+        content: "overlay\nbr_netfilter\n"
+        mode: '0644'
+
+- name: Configure sysctl for K8s networking
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/k3s.conf
+    reload: yes
+  loop:
+    - { key: 'net.bridge.bridge-nf-call-iptables', value: '1' }
+    - { key: 'net.ipv4.ip_forward', value: '1' }
+
+- name: Install prerequisite packages
+  apt:
+    name: [curl, jq, ca-certificates, gnupg]
+    state: present
+    update_cache: yes
+
+# 2. K3s 설치 준비
+- name: Check K3s installation status
+  stat:
+    path: /usr/local/bin/k3s
+  register: k3s_binary
+
+- name: Download K3s install script
+  get_url:
+    url: "{{ k3s_install_url }}"
+    dest: /tmp/install-k3s.sh
+    mode: '0755'
+  when: not k3s_binary.stat.exists
+  retries: "{{ k3s_install_retry_count }}"
+  delay: "{{ k3s_install_retry_delay }}"
+
+# 3. Master 노드 설치 및 정보 추출
+- name: Master node setup
+  block:
+    - name: Run K3s Master installer
+      shell: |
+        INSTALL_K3S_VERSION="{{ k3s_version }}" \
+        /tmp/install-k3s.sh {{ k3s_server_options | join(' ') }}
+      when: not k3s_binary.stat.exists
+
+    - name: Wait for API Server (6443)
+      wait_for:
+        port: 6443
+        timeout: 60
+
+    - name: Extract K3s node token
+      command: cat /var/lib/rancher/k3s/server/node-token
+      register: master_token
+      changed_when: false
+
+    - name: Set cluster facts
+      set_fact:
+        k3s_cluster_token: "{{ master_token.stdout }}"
+        k3s_master_internal_ip: "{{ ansible_default_ipv4.address }}"
+        cacheable: yes
+  when: inventory_hostname in groups['master']
+
+# 4. Worker 노드 설치 및 연결
+- name: Worker node setup
+  block:
+    - name: Run K3s Worker installer
+      shell: |
+        K3S_URL="https://{{ hostvars[groups['master'][0]].k3s_master_internal_ip }}:6443" \
+        K3S_TOKEN="{{ hostvars[groups['master'][0]].k3s_cluster_token }}" \
+        INSTALL_K3S_VERSION="{{ k3s_version }}" \
+        /tmp/install-k3s.sh {{ k3s_agent_options | default([]) | join(' ') }}
+      when: not k3s_binary.stat.exists
+      retries: 3
+      delay: 10
+  when: inventory_hostname in groups['worker']
+
+# 5. 마무리 및 검증
+- name: Clean up
+  file:
+    path: /tmp/install-k3s.sh
+    state: absent
+
+- name: Show cluster nodes (Master only)
+  command: /usr/local/bin/kubectl get nodes -o wide
+  register: nodes_list
+  when: inventory_hostname in groups['master']
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+  changed_when: false
+
+- name: Display nodes info
+  debug:
+    var: nodes_list.stdout_lines
+  when: inventory_hostname in groups['master']

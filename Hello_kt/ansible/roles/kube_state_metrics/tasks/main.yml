@@ -1,0 +1,52 @@
+---
+- name: Create temporary directory
+  file:
+    path: "{{ ksm_tmp_dir }}"
+    state: directory
+
+- name: Download KSM manifests
+  get_url:
+    url: "https://raw.githubusercontent.com/kubernetes/kube-state-metrics/{{ ksm_version }}/examples/standard/{{ item }}"
+    dest: "{{ ksm_tmp_dir }}/{{ item }}"
+  loop: "{{ ksm_manifests }}"
+
+- name: Overwrite service.yaml with NodePort config
+  copy:
+    dest: "{{ ksm_tmp_dir }}/service.yaml"
+    content: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        labels:
+          app.kubernetes.io/component: exporter
+          app.kubernetes.io/name: kube-state-metrics
+          app.kubernetes.io/version: {{ ksm_version }}
+        name: kube-state-metrics
+        namespace: kube-system
+      spec:
+        type: NodePort
+        ports:
+        - name: http-metrics
+          port: 8080                     # 서비스(ClusterIP) 내부 포트 (클러스터 안에서만 유효)
+          targetPort: 8080               # KSM 컨테이너가 실제로 리스닝하는 포트
+          nodePort: {{ ksm_node_port }}  #  외부 워커 노드 IP:30081로 접속할 포트
+        selector:
+          app.kubernetes.io/name: kube-state-metrics
+
+- name: Delete existing KSM service (Force Refresh)
+  shell: "kubectl delete svc kube-state-metrics -n kube-system --ignore-not-found=true"
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Apply KSM manifests
+  shell: "kubectl apply -f {{ ksm_tmp_dir }}/"
+  environment:
+    KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+
+- name: Wait for KSM Pod to be ready
+  shell: "kubectl get pods -n kube-system -l app.kubernetes.io/name=kube-state-metrics"
+  register: ksm_status
+  retries: 10
+  delay: 10
+  until: "'Running' in ksm_status.stdout"
+

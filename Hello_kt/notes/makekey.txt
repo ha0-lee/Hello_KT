@@ -1,0 +1,63 @@
+. [열쇠 만들기] tls_private_key 리소스
+인스턴스에 접속할 때 사용할 디지털 열쇠 세트를 생성하는 단계입니다.
+
+Terraform
+resource "tls_private_key" "deployer" {
+  algorithm = "RSA"  # 암호화 알고리즘 종류
+  rsa_bits  = 4096   # 보안 강도 (숫자가 높을수록 안전함)
+}
+역할: 사용자가 직접 ssh-keygen 명령어를 치지 않아도, Terraform이 실행될 때 메모리상에 **비밀키(Private Key)**와 공개키(Public Key) 한 쌍을 만듭니다.
+
+비유: 대장장이가 아무도 열 수 없는 특별한 '열쇠'와 그에 맞는 '자물쇠'를 갓 구워낸 상태입니다.
+
+2. [자물쇠 등록] aws_key_pair 리소스
+생성된 열쇠 세트 중 **자물쇠(공개키)**를 클라우드 시스템에 등록합니다.
+
+Terraform
+resource "aws_key_pair" "deployer" {
+  key_name   = "k3s-deployer"
+  public_key = tls_private_key.deployer.public_key_openssh
+}
+역할: 위에서 만든 공개키를 k3s-deployer라는 이름으로 AWS(또는 KT Cloud)에 등록합니다.
+
+효과: 이제 인스턴스를 만들 때 이 이름을 쓰면, 클라우드가 인스턴스 현관문에 이 자물쇠를 자동으로 달아줍니다.
+
+3. [열쇠 파일 저장] local_file "ssh_key" 리소스
+메모리에만 존재하는 **비밀키(열쇠)**를 사용자의 컴퓨터에 실제 파일로 저장합니다.
+
+Terraform
+resource "local_file" "ssh_key" {
+  content         = tls_private_key.deployer.private_key_pem # 비밀키 내용
+  filename        = "${path.module}/k3s-deployer.pem"        # 저장할 파일 이름
+  file_permission = "0600"                                   # 보안 설정
+}
+역할: 메모리에 있는 비밀키를 내 로컬 폴더에 .pem 파일로 내려받습니다.
+
+중요성: 이게 없으면 자물쇠(인스턴스)는 있는데 열쇠가 없어서 내가 못 들어가는 불상사가 생깁니다. 0600 권한은 "나(소유자) 말고는 이 열쇠를 보지 못하게 하라"는 필수 보안 설정입니다.
+
+4. [지도 제작] local_file "ansible_inventory" 리소스
+생성된 서버들의 주소와 접속 방법을 정리한 **Ansible용 명단(Inventory)**을 만듭니다.
+
+Terraform
+resource "local_file" "ansible_inventory" {
+  content = <<-EOT
+  [master]
+  ${aws_instance.web_server[0].private_ip} ... # 웹서버 1번 내부 IP
+  [worker]
+  ${aws_instance.web_server[1].private_ip} ... # 웹서버 2번 내부 IP
+  [monitoring]
+  ${aws_instance.monitoring_server.public_ip} ... # 모니터링 공인 IP
+  
+  [k3s_cluster:vars]
+  ansible_ssh_common_args='-o ProxyCommand="ssh -W %h:%p -q ubuntu@${aws_instance.monitoring_server.public_ip} ..."'
+  EOT
+  ...
+  depends_on = [aws_instance.web_server, aws_instance.monitoring_server, local_file.ssh_key]
+}
+역할:
+
+IP 자동 기입: 인스턴스가 생성될 때마다 매번 바뀌는 IP 주소를 Terraform이 알아서 알아내어 파일에 써줍니다.
+
+ProxyCommand 설정 (★핵심): 프라이빗 서브넷에 있는 웹서버들은 외부에서 직접 못 들어갑니다. 그래서 **"모니터링 서버를 징검다리 삼아 점프해서 들어가라"**는 고난도 설정을 자동으로 넣어줍니다.
+
+depends_on: "인스턴스도 다 지어지고, 열쇠(.pem)도 내 컴퓨터에 저장된 후에 이 지도를 만들어라"라는 순서 보장 장치입니다.

@@ -1,0 +1,8 @@
+---
+nginx_site_name: lunch
+
+# NodePort(앱 서비스 포트)
+lunch_node_port: 30080
+
+# 외부에서 받을 포트
+nginx_listen_port: 80

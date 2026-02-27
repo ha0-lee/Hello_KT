@@ -1,0 +1,19 @@
+---
+app_name: lunch-api
+app_namespace: lunch
+
+# ✅ 네 GHCR 이미지 (너가 올린 workflow 기준)
+# ghcr.io/<owner>/<repo>/lunch-api:latest
+app_image: ghcr.io/hjh6709/lunch_app_second/lunch-api:latest
+
+app_replicas: 2
+container_port: 8000
+
+# 외부에서 접속할 방식 (최소로 NodePort)
+service_type: NodePort
+service_port: 80
+node_port: 30080
+
+# 추후 교체 예정 (ALB/Ingress) 생각한다면
+# service_type: ClusterIP
+# node_port: 30080   # NodePort 쓸 때만 켜기

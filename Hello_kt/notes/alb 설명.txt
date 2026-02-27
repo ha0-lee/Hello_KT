@@ -1,0 +1,70 @@
+resource "aws_lb" "web_alb" {
+  name               = "web-app-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.web_sg.id]
+  subnets = [aws_subnet.public_1.id, aws_subnet.public_2.id] # ALB는 서브넷 2개 이상 필요
+}
+
+1. internal = false (외부용인가, 내부용인가?)
+이 옵션은 로드밸런서가 **"인터넷에서 접속 가능한 공인 IP를 가질 것인가?"**를 결정합니다.
+
+false (Public ALB): 인터넷 게이트웨이(IGW)를 통해 전 세계 사용자가 접속할 수 있는 공인 IP/도메인이 부여됩니다. 지금처럼 웹 서비스를 외부로 노출할 때 사용합니다.
+
+true (Internal ALB): VPC 내부에서만 접근 가능한 사설 IP만 가집니다. 예를 들어, '웹 서버'가 '로그 처리 서버'들에게 트래픽을 나눠줄 때처럼 우리끼리만 쓰는 로드밸런서가 필요할 때 사용합니다.
+
+2. load_balancer_type = "application" (ALB vs NLB)
+트래픽을 어떤 기준으로 나눌지 결정하는 '지능'의 수준을 정합니다.
+
+Application (ALB): L7(애플리케이션 계층) 로드밸런서입니다.
+
+단순 IP 주소뿐만 아니라 HTTP 헤더, URL 경로를 읽을 수 있습니다.
+
+예: /api로 오면 A 서버로, /static으로 오면 B 서버로 보내는 스마트한 배분이 가능합니다. (현재 프로젝트의 웹 서비스에 가장 적합합니다!)
+
+Network (NLB): L4(전송 계층) 로드밸런서입니다.
+
+패킷의 내용(HTTP 등)은 안 보고 IP와 포트만 보고 아주 빠르게 전달합니다. 대규모 트래픽 처리에 유리합니다.
+
+3. subnets (로드밸런서를 어디에 둘 것인가?)
+네, 맞습니다! 로드밸런서가 발을 딛고 서 있을 서브넷을 지정하는 것입니다.
+
+Public Subnet 지정: 외부 사용자(internal = false)가 접속해야 하므로, 반드시 인터넷 게이트웨이(IGW)와 연결된 퍼블릭 서브넷들을 지정해야 합니다.
+
+왜 2개 이상인가요? (고가용성): 클라우드의 핵심은 **"장애 대응"**입니다. 만약 KT Cloud의 특정 데이터센터(Zone)에 문제가 생겨도, 다른 Zone에 있는 서브넷을 통해 서비스가 중단되지 않게 하기 위함입니다.
+
+그래서 보통 public_1(Zone A)와 public_2(Zone B)처럼 서로 다른 위치의 서브넷을 적어줍니다.
+
+
+resource "aws_lb_target_group" "app_tg" {
+  name     = "app-target-group"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.main.id
+}
+
+
+resource "aws_lb_listener" "http" {
+  load_balancer_arn = aws_lb.web_alb.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.app_tg.arn
+  }
+}
+
+1. aws_lb_target_group (대상 그룹): "트래픽이 도착할 종점 리스트"
+비유하자면 **"배차 대기 명단"**입니다. 로드밸런서가 트래픽을 보낼 목적지 서버들을 하나로 묶어놓은 그룹이에요.
+
+port = 80, protocol = "HTTP": "이 그룹에 속한 서버들은 80번 포트로 HTTP 요청을 받을 준비를 하고 있어"라는 뜻입니다.
+
+중요한 점: 여기서는 '이런 성격의 서버들이 모일 거야'라고 정의만 한 상태입니다. 나중에 이 그룹에 실제 인스턴스를 하나하나 등록(aws_lb_target_group_attachment)해줘야 트래픽이 그 서버로 흘러갑니다.
+
+2. aws_lb_listener (리스너): "로드밸런서의 귀"
+비유하자면 **"입구에서 손님을 기다리는 안내원"**입니다. 로드밸런서가 외부에서 오는 요청을 어떤 포트로 '듣고(Listen)' 있을지 결정합니다.
+
+port = "80", protocol = "HTTP": "누구든 로드밸런서의 80번 포트로 HTTP 요청을 보내면 내가 다 받아줄게!"
+
+default_action { type = "forward" ... }: "받은 요청은 아까 만든 **app_tg(대상 그룹)**로 그대로 전달해!"라는 명령어입니다.

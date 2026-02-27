@@ -1,0 +1,75 @@
+
+# archive_file 블럭은 environment 블럭을 통해 전원을 켤 인스턴스 이름이 담긴 리스트를
+# INSTANCE_IDS라는 이름으로 전달 받고 filename을 통해 
+# handler에서 실행할 코드가 담긴 압축 파일을 접근을 하고 
+# handler를 통해 압축파일의 코드(인스턴스 시작)를 실행
+
+# aws_lambda_function 리소스의 문서를 보면 
+# role 항목에 **"IAM Role의 ARN을 넣어야 한다"**라고 정의되어 있습니다.
+
+# data.archive_file.stop_zip : 
+# 람다 함수의 소스 코드가 담긴 압축 파일에 대한 모든 정보
+# output_path : 
+# 그 압축 파일의 경로를 의미
+# ${path.module}/ec2_stop.zip 와 같은 의미
+
+# 호출 (Trigger): 어떤 이벤트(예: 스케줄러)가 람다를 깨웁니다.
+# 권한 획득 (Role): aws_iam_role.lambda_role.arn에 정의된 신분증을 가슴에 딱 붙입니다. 이 신분증 덕분에 EC2를 켜거나 끌 수 있는 **'권한'**이 생깁니다.
+# 파일 탐색 (Handler - 앞부분): handler의 "ec2_start" 부분을 보고, 압축 파일(ZIP) 안에 있는 ec2_start.py라는 파일을 찾습니다.
+# 함수 실행 (Handler - 뒷부분): 파일 안에서 "lambda_handler"라고 이름 붙여진 함수를 찾아 실행합니다. 이때 INSTANCE_IDS 같은 환경 변수를 들고 들어갑니다.
+
+ # source_code_hash = data.archive_file.stop_zip.output_base64sha256
+ # 람다 함수가 변경되었는지 확인하는 용도
+ # .output_base64sha256: 압축된 결과물의 지문(해시값)을 가져오라는 뜻
+ #이 줄이 없으면, 여러분이 파이썬 코드를 수정하고 아무리 apply를 해도 
+ # AWS에 있는 람다 코드는 옛날 버전 그대로 멈춰있을 확률이 높습니다. 
+ # 즉, **"코드 수정 사항을 강제로 반영시키기 위한 필수 장치"**라고 보시면 됩니다.
+
+ # 6. EventBridge (스케줄러) - 10시 시작
+# 알람 시계 만들기: aws_cloudwatch_event_rule (지금 하신 것)
+# 시계와 람다 연결: "시계가 울리면 이 람다를 실행해!" (aws_cloudwatch_event_target)
+# 람다의 허락: "알람 시계가 나를 깨우는 것을 허락할게!" (aws_lambda_permission)
+
+# target_id : 
+# EventBridge 내에서 타겟을 식별하는 고유 ID입니다.
+# 알람을 들려줄 대상과 연결된 다리의 이름
+
+# aws_lambda_permission
+# 람다 함수에 특정 주체(여기서는 EventBridge)가 접근할 수 있는 권한을 부여합니다.
+# 알람을 들려줄 대상(람다 함수)에게 이벤트 브릿지로 연결을 했는데 
+# 그마저도 허락이 필요함
+#보안상의 이유: 누군가 내 계정의 다른 알람 시계(Rule)를 마음대로 만들어서, 내가 애지중지 만든 람다 함수를 미친 듯이 호출(Invoke)해버리면 비용이 폭탄처럼 나올 수 있겠죠?
+#검문소 역할: 그래서 람다는 **"오직 내가 허락한 특정 알람 시계(source_arn)만이 나를 깨울 수 있다!"**라고 문 앞에 써 붙여 놓는 것입니다.
+/*
+1. action = "lambda:InvokeFunction"
+의미: "어떤 행동을 허락할 것인가?"
+상세: 람다의 가장 핵심적인 기능인 **'실행(Invoke)'**을 허락한다는 뜻입니다. 이 권한이 있어야만 외부에서 람다의 스위치를 누를 수 있습니다.
+
+2. function_name = aws_lambda_function.ec2_start_lambda.function_name
+의미: "누구의 대문을 열어줄 것인가?"
+상세: 허락을 해줄 주인공(대상)을 지정합니다. 여기서는 우리가 아까 만든 ec2_start_lambda라는 람다 함수가 그 주인공입니다.
+
+3. principal = "events.amazonaws.com"
+의미: "어떤 종류의 손님인가? (신분 확인)"
+상세: 이 손님은 **'EventBridge(CloudWatch Events)'**라는 서비스에서 온 손님이라는 뜻입니다. AWS의 각 서비스는 고유한 이름(Service Principal)을 가지고 있는데, 알람 시계 서비스의 이름이 바로 events.amazonaws.com입니다.
+
+4. source_arn = aws_cloudwatch_event_rule.start_rule.arn
+의미: "딱 이 알람 시계가 맞나? (주소 확인)"
+상세: 가장 중요한 보안 필터입니다. 그냥 '알람 서비스'면 다 통과시키는 게 아니라, **"오직 우리가 만든 start_rule이라는 특정 알람 시계"**에서 온 신호만 받겠다는 뜻입니다.
+*/
+
+
+# ** 
+# ARN (주소)이 필요한 경우: * 서로 다른 서비스끼리 통신할 때 주로 씁니다. (예: EventBridge가 Lambda를 호출할 때)
+# AWS 전체 시스템에서 "이 녀석은 확실히 이 계정의 이 지역에 있는 녀석이다"라는 완전한 식별이 필요할 때 사용합니다.
+# 다른 서비스 간에 권한을 주거나 호출할 때 (예: IAM, Lambda)
+
+# Name (이름)이 필요한 경우:
+# 같은 서비스 안에서 리소스를 묶어줄 때 주로 씁니다. (예: CloudWatch Rule에 CloudWatch Target을 붙일 때)
+# 같은 서비스 내에서 이름을 부를 때 (예: CloudWatch Rule 이름)
+
+# ID (아이디)가 필요한 경우:
+# 리소스를 조작하거나 특정 번호로 식별해야 할 때 (예: EC2 ID, VPC ID, Subnet ID)
+# 리소스를 조작하거나 참조할 때 (예: 보안 그룹 ID, 서브넷 ID)
+# **Primary Key(기본키)**와 같습니다. 이름(name)은 중복될 수도 있고, ARN은 너무 길어서 다루기 불편할 때가 있죠. 
+# 하지만 .id는 클라우드 제공자(AWS/KT Cloud)가 해당 리소스를 제어하기 위해 만든 최적화된 코드

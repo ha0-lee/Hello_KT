@@ -1,0 +1,35 @@
+- name: Check if Helm is installed
+  command: which helm
+  register: helm_installed
+  ignore_errors: yes
+  changed_when: false
+
+- name: Install Helm if not present
+  shell: |
+    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  when: helm_installed.rc != 0
+
+- name: Add Grafana Helm repo
+  command: >
+    helm repo add grafana https://grafana.github.io/helm-charts
+  args:
+    creates: /root/.cache/helm/repository/grafana-index.yaml
+
+- name: Update Helm repo
+  command: helm repo update
+  changed_when: false
+
+- name: Copy Loki values file
+  template:
+    src: loki-values.yaml.j2
+    dest: /tmp/loki-values.yaml
+
+- name: Deploy Loki Stack with Helm
+  command: >
+    helm upgrade --install loki grafana/loki-stack
+    --namespace {{ loki_namespace }}
+    --create-namespace
+    -f /tmp/loki-values.yaml
+  environment:
+    KUBECONFIG: "{{ kubeconfig_path }}"
+

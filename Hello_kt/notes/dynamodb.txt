@@ -1,0 +1,50 @@
+# =================================================================
+# 테라폼 백엔드 인프라 설정 (S3 & DynamoDB)
+# =================================================================
+# 이 리소스들은 테라폼의 '상태 파일(State)'과 '잠금(Lock)'을 관리합니다.
+# 서비스 인프라(EC2, VPC 등)와 별개로 관리하여 destroy 시의 사고를 방지합니다.
+
+# 1. 테라폼 상태 파일 저장용 S3 버킷
+resource "aws_s3_bucket" "tfstate" {
+  # [cite_start]variables.tf에 정의된 버킷 이름을 사용합니다. [cite: 1]
+  # 주의: backend.tf의 bucket 이름과 항상 일치해야 합니다.
+  bucket = var.tfstate_bucket_name 
+
+  # [중요] lifecycle 설정: terraform destroy 명령을 실행해도 이 리소스는 삭제되지 않습니다.
+  # 실수로 상태 파일이 담긴 버킷이 날아가는 것을 방지하기 위한 안전장치입니다.
+  lifecycle {
+    prevent_destroy = true 
+  }
+
+  tags = {
+    Name        = "Terraform State Storage"
+    [cite_start]Environment = var.environment [cite: 1]
+    Description = "Managed by Terraform - Do not delete"
+  }
+}
+
+# 2. 테라폼 상태 잠금용 DynamoDB 테이블
+resource "aws_dynamodb_table" "terraform_lock" {
+  name         = "terraform-lock"
+  billing_mode = "PAY_PER_REQUEST"
+  # 테라폼 백엔드 표준에 따라 해시 키는 반드시 'LockID'여야 합니다.
+  hash_key     = "LockID" 
+
+  attribute {
+    name = "LockID"
+    type = "S" # String 타입
+  }
+
+  # [중요] lifecycle 설정: 인프라 전체 삭제 시에도 잠금 테이블은 유지합니다.
+  # 만약 이 테이블이 먼저 삭제되면, 테라폼이 작업을 마치고 잠금을 해제하려 할 때 
+  # 'ResourceNotFoundException' 에러가 발생하며 프로세스가 꼬일 수 있습니다.
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  tags = {
+    Name        = "Terraform State Lock Table"
+    [cite_start]Project     = var.project_name [cite: 1]
+    [cite_start]Environment = var.environment [cite: 1]
+  }
+}

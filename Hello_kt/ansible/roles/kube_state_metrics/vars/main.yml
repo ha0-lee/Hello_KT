@@ -1,0 +1,11 @@
+---
+ksm_version: "v2.10.1"
+ksm_node_port: 30081
+ksm_tmp_dir: "/tmp/ksm"
+ksm_manifests:
+  - cluster-role-binding.yaml
+  - cluster-role.yaml
+  - deployment.yaml
+  - service-account.yaml
+  - service.yaml
+

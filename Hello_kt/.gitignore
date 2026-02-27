@@ -1,0 +1,16 @@
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.zip
+terraform.tfvars  # 보안 민감 정보
+
+# fastapi cache
+__pycache__/
+
+ansible/key/Hello_kt.pem
+
+terraform/Hello_kt.pem
+
+*.pem
+
+.DS_Store
