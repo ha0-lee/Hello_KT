@@ -14,3 +14,8 @@ terraform/Hello_kt.pem
 *.pem
 
 .DS_Store
+# Ansible inventory (environment-specific)
+ansible/inventory/aws.ini
+
+# Inventory (generated / env-specific)
+ansible/inventory/aws.ini
