@@ -1,8 +1,0 @@
----
-- name: Deploy lunch-api (self-healing)
-  hosts: master
-  become: yes
-  gatehr_facts: no
-  roles:
-    - role: app_deploy
-      tags: ["app", "deploy"]
