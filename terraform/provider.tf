@@ -42,6 +42,6 @@ resource "aws_key_pair" "hello_kt_key" {
 # [추가 필수] 테라폼이 만든 열쇠를 내 컴퓨터에 실물 .pem 파일로 저장
 resource "local_file" "ssh_key" {
   content         = tls_private_key.deployer.private_key_pem
-  filename        = "${path.module}/Hello_kt.pem"
+  filename        = "${path.module}/../ansible/key/Hello_kt.pem"
   file_permission = "0600"
 }
