@@ -249,7 +249,12 @@ resource "aws_instance" "monitoring_server" {
   subnet_id              = aws_subnet.public_1.id
   iam_instance_profile   = aws_iam_instance_profile.monitoring_profile.name
   key_name               = var.key_name
-
+  # 루트 볼륨 사이즈 설정 추가
+  root_block_device {
+    volume_size           = 20    # 기본 8GB에서 20GB로 확장
+    volume_type           = "gp3" # 성능과 가성비가 좋은 gp3 권장
+    delete_on_termination = true
+  }
   tags = {
     Name        = "${var.project_name}-Monitoring-Server"
     Environment = var.environment
