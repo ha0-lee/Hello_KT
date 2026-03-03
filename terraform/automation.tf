@@ -55,11 +55,12 @@ resource "aws_lambda_function" "ec2_start_lambda" {
   role          = aws_iam_role.lambda_role.arn
   handler       = "ec2_start.lambda_handler"
   runtime       = "python3.9"
-
+  source_code_hash = data.archive_file.start_zip.output_base64sha256
+  timeout       = 60
 
   environment {
     variables = {
-      # [중요!] 생성된 EC2 2대의 ID를 쉼표로 합쳐서 자동으로 전달합니다.
+      # [중요!] 생성된 EC2 2대의 ID를 쉼표로 합쳐서 자동으로 전달
       INSTANCE_IDS = join(",", concat(aws_instance.Worker_server[*].id, [aws_instance.Master_server.id], [aws_instance.monitoring_server.id]))
     }
   }
@@ -73,6 +74,7 @@ resource "aws_lambda_function" "ec2_stop_lambda" {
   handler          = "ec2_stop.lambda_handler"
   runtime          = "python3.9"
   source_code_hash = data.archive_file.stop_zip.output_base64sha256
+  timeout          = 60
 
   environment {
     variables = {
