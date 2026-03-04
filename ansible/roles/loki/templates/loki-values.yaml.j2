@@ -3,27 +3,25 @@ loki:
   image:
     repository: grafana/loki
     tag: "2.9.3"
-    pullPolicy: IfNotPresent:
+    pullPolicy: IfNotPresent
 
-  # --- 2GB RAM 환경 최적화 (안정성 중심) ---
+  # --- 특정 노드 고정 설정 제거됨 ---
+
+  # --- 자원 제한 (2GB 서버 최적화) ---
+  resources:
+    limits:
+      memory: "512Mi"
+    requests:
+      memory: "256Mi"
+
   config:
     limits_config:
-      # 대기열은 늘리되, 실제 동시 처리는 줄여야 메모리가 안 터집니다.
-      max_outstanding_requests: 1000  
-      # 5분은 너무 깁니다. 쿼리가 꼬이면 서버가 계속 고통받으니 2분으로 타협하세요.
-      query_timeout: 2m               
-      # 2GB RAM에서는 병렬 처리를 최소화해야 합니다. (기본값 근처로 조정)
-      max_query_parallelism: 2        
-    
+      max_query_parallelism: 2
     querier:
-      # 가장 중요한 부분! 10 -> 2~4로 줄이세요. 
-      # 대시보드 패널이 많을 때 메모리 폭발을 막아주는 안전장치입니다.
-      max_concurrent: 2               
-
-  # ----------------------------------
+      max_concurrent: 2
 
   persistence:
-    enabled: false  # 메모리를 쓰기 때문에 더더욱 위 설정(concurrent)이 중요합니다.
+    enabled: false
 
   service:
     type: NodePort
@@ -31,3 +29,16 @@ loki:
 
 promtail:
   enabled: true
+  # --- 로그 수집 최적화: lunch 네임스페이스만 수집 ---
+  pipelineStages:
+    - docker: {}
+    - match:
+        selector: '{namespace!="lunch"}'
+        action: drop
+
+  resources:
+    limits:
+      memory: "150Mi"
+    requests:
+      memory: "64Mi"
+
