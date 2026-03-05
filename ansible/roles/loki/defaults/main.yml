@@ -1,0 +1,7 @@
+loki_release_name: loki
+loki_namespace: monitoring
+loki_chart: grafana/loki
+loki_repo_name: grafana
+loki_repo_url: https://grafana.github.io/helm-charts
+kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+

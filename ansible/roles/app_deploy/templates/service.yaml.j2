@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ app_name }}
+  namespace: {{ app_namespace }}
+spec:
+  selector:
+    app: {{ app_name }}
+  type: {{ service_type }}
+  ports:
+    - name: http
+      port: {{ service_port }}
+      targetPort: {{ container_port }}
+{% if service_type == 'NodePort' %}
+      nodePort: {{ node_port }}
+{% endif %}

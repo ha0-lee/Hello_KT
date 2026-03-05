@@ -1,0 +1,67 @@
+---
+
+- name: Docker 설치 여부 확인
+  command: docker --version
+  register: docker_check
+  failed_when: false
+  changed_when: false
+
+- name: Docker 미설치 시 설치
+  block:
+    - name: Docker 설치 스크립트 다운로드
+      get_url:
+        url: https://get.docker.com
+        dest: /tmp/get-docker.sh
+        mode: '0755'
+
+    - name: Docker 설치
+      command: sh /tmp/get-docker.sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: Docker 서비스 시작 및 활성화
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: ubuntu 사용자 docker 그룹 추가
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
+  when: docker_check.rc != 0
+
+- name: Node Exporter 컨테이너 실행
+  community.docker.docker_container:
+    name: node-exporter
+    image: prom/node-exporter:latest
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.rootfs=/host'
+    pid_mode: host
+    volumes:
+      - '/:/host:ro,rslave'
+
+#바뀐 부분 
+- name: cAdvisor 컨테이너 실행
+  community.docker.docker_container:
+    name: cadvisor
+    image: gcr.io/cadvisor/cadvisor:latest
+    state: started
+    restart_policy: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:ro"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
+      - "/dev/disk/:/dev/disk:ro"
+    devices:
+      - "/dev/kmsg"
+    # cAdvisor가 시스템 메트릭에 접근하기 위해 가끔 필요
+    privileged: true
