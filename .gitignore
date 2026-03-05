@@ -1,5 +1,15 @@
 # ■ Ansible 관련 ■
 
+# ■ Terraform 관련 ■
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.zip
+terraform.tfvars  # 보안 민감 정보
+
+# fastapi cache
+__pycache__/
+
 # Keys 
 *.pem
 *.key
