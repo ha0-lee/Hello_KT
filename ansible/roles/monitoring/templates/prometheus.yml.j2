@@ -1,6 +1,6 @@
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 30s
+  evaluation_interval: 30s
   external_labels:
     cluster: 'k3s-production'
     monitor: 'main-monitoring'
@@ -17,13 +17,14 @@ scrape_configs:
       - region: ap-northeast-2
         port: 9100
     relabel_configs:
-      # AWS Name 태그를 인스턴스 이름으로 사용
+      # Role 태그에 Master, Worker, Bastion(Prometheus용)이 포함된 것 수집
+      # (?i)는 대소문자 무시, .*는 앞뒤 어떤 문자가 와도 상관없다는 뜻입니다.
+      - source_labels: [__meta_ec2_tag_Role]
+        regex: '(?i).*(Master|Worker|Bastion).*'
+        action: keep
+      # AWS Name 태그를 Grafana에서 볼 인스턴스 이름으로 매핑
       - source_labels: [__meta_ec2_tag_Name]
         target_label: instance
-      # Role 태그가 master, worker, monitoring인 것만 수집
-      - source_labels: [__meta_ec2_tag_Role]
-        regex: (master|worker|monitoring)
-        action: keep
 
   # 3. AWS EC2 자동 탐지 (cAdvisor - 컨테이너 모니터링용)
   - job_name: 'ec2-cadvisor'
@@ -31,22 +32,20 @@ scrape_configs:
       - region: ap-northeast-2
         port: 8080
     relabel_configs:
+      - source_labels: [__meta_ec2_tag_Role]
+        regex: '(?i).*(Master|Worker|Bastion).*'
+        action: keep
       - source_labels: [__meta_ec2_tag_Name]
         target_label: instance
-      - source_labels: [__meta_ec2_tag_Role]
-        regex: (master|worker|monitoring)
-        action: keep
 
-  # 4. AWS EC2 자동 탐지 (Kube-state-metrics 모니터링용)
+  # 4. AWS EC2 자동 탐지 (Kube-state-metrics)
   - job_name: 'ec2-ksm'
     ec2_sd_configs:
       - region: ap-northeast-2
-        port: 30081  # KSM NodePort 번호
+        port: 30081
     relabel_configs:
+      - source_labels: [__meta_ec2_tag_Role]
+        regex: '(?i).*(Master|Worker).*'
+        action: keep
       - source_labels: [__meta_ec2_tag_Name]
         target_label: instance
-      # KSM은 보통 master나 worker 노드에서 실행되므로 해당 노드들만 유지
-      - source_labels: [__meta_ec2_tag_Role]
-        regex: (master|worker)
-        action: keep
-
