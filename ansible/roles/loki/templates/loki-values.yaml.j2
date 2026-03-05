@@ -5,34 +5,20 @@ loki:
     tag: "2.9.3"
     pullPolicy: IfNotPresent
 
-  # --- 자가 복구(Self-healing) 설정 추가 ---
-  livenessProbe:
-    httpGet:
-      path: /ready
-      port: 3100
-    initialDelaySeconds: 45
-    periodSeconds: 10
-  readinessProbe:
-    httpGet:
-      path: /ready
-      port: 3100
-    initialDelaySeconds: 45
-    periodSeconds: 10
-  # -------------------------------------
+  # --- 특정 노드 고정 설정 제거됨 ---
 
-  # --- 성능 최적화 및 오류 수정 반영 ---
+  # --- 자원 제한 (2GB 서버 최적화) ---
+  resources:
+    limits:
+      memory: "512Mi"
+    requests:
+      memory: "256Mi"
+
   config:
     limits_config:
-      max_query_parallelism: 24
-      query_timeout: 5m
-      max_query_series: 100000
-    
+      max_query_parallelism: 2
     querier:
-      max_concurrent: 16
-
-    query_range:
-      parallelise_shardable_queries: true
-  # ----------------------------------
+      max_concurrent: 2
 
   persistence:
     enabled: false
@@ -43,3 +29,15 @@ loki:
 
 promtail:
   enabled: true
+  # --- 로그 수집 최적화: lunch 네임스페이스만 수집 ---
+  pipelineStages:
+    - docker: {}
+    - match:
+        selector: '{namespace!="lunch"}'
+        action: drop
+
+  resources:
+    limits:
+      memory: "150Mi"
+    requests:
+      memory: "64Mi"
